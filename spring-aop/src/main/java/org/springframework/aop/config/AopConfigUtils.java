@@ -40,8 +40,8 @@ import org.springframework.util.Assert;
  * @author Rob Harrop
  * @author Juergen Hoeller
  * @author Mark Fisher
- * @since 2.5
  * @see AopNamespaceUtils
+ * @since 2.5
  */
 public abstract class AopConfigUtils {
 
@@ -90,13 +90,15 @@ public abstract class AopConfigUtils {
 
 	@Nullable
 	public static BeanDefinition registerAspectJAnnotationAutoProxyCreatorIfNecessary(BeanDefinitionRegistry registry) {
+		// TODO 进入
 		return registerAspectJAnnotationAutoProxyCreatorIfNecessary(registry, null);
 	}
 
 	@Nullable
 	public static BeanDefinition registerAspectJAnnotationAutoProxyCreatorIfNecessary(
 			BeanDefinitionRegistry registry, @Nullable Object source) {
-
+		// 注册AnnotationAwareAspectJAutoProxyCreator组件
+		// TODO 进入
 		return registerOrEscalateApcAsRequired(AnnotationAwareAspectJAutoProxyCreator.class, registry, source);
 	}
 
@@ -114,14 +116,35 @@ public abstract class AopConfigUtils {
 		}
 	}
 
+	/**
+	 * TODO 查看 类 AnnotationAwareAspectJAutoProxyCreator
+	 * 1.实现了一系列Aware的接口，如BeanFactoryAware、BeanClassLoaderAware
+	 * <p>
+	 * 2.间接实现了BeanPostProcessor接口，它允许我们在bean初始化前、后对bean进行修改，或产生一个bean的代理对象等，
+	 * 我们需要重点关注AnnotationAwareAspectJAutoProxyCreator
+	 * 以及其各个父类中postProcessBeforeInitialization()、postProcessAfterInitialization()方法的处理过程
+	 * <p>
+	 * 3.间接实现了InstantiationAwareBeanPostProcessor接口，
+	 * 所以我们也需要重点关注AnnotationAwareAspectJAutoProxyCreator
+	 * 以及其各个父类中postProcessBeforeInstantiation()、postProcessAfterInstantiation()方法的实现；
+	 *
+	 * @param cls
+	 * @param registry
+	 * @param source
+	 * @return
+	 */
 	@Nullable
 	private static BeanDefinition registerOrEscalateApcAsRequired(
 			Class<?> cls, BeanDefinitionRegistry registry, @Nullable Object source) {
 
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
-
+		// 判断IOC容器中是否已经存在beanName="org.springframework.aop.config.internalAutoProxyCreator"
+		// 的自动代理创建器（即用户自定义的AnnotationAwareAspectJAutoProxyCreator）
 		if (registry.containsBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME)) {
 			BeanDefinition apcDefinition = registry.getBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME);
+			// 如果已经存在自动代理创建器，需判断cls对象的name和apcDefinition的beanClassName是否相等，
+			// 如果不相等的话，则获取apcDefinition和cls的优先级，如果apcDefinition的优先级小于cls的优先级，
+			// 则将apcDefinition的beanClassName设置为cls的name值
 			if (!cls.getName().equals(apcDefinition.getBeanClassName())) {
 				int currentPriority = findPriorityForClass(apcDefinition.getBeanClassName());
 				int requiredPriority = findPriorityForClass(cls);
@@ -131,11 +154,14 @@ public abstract class AopConfigUtils {
 			}
 			return null;
 		}
-
+		// 将现在要注册的AnnotationAwareAspectJAutoProxyCreator封装成RootBeanDefinition
 		RootBeanDefinition beanDefinition = new RootBeanDefinition(cls);
 		beanDefinition.setSource(source);
+		// 拥有最高优先级
 		beanDefinition.getPropertyValues().add("order", Ordered.HIGHEST_PRECEDENCE);
 		beanDefinition.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+		// 往IOC容器中注入AnnotationAwareAspectJAutoProxyCreator,
+		// name为"org.springframework.aop.config.internalAutoProxyCreator"
 		registry.registerBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME, beanDefinition);
 		return beanDefinition;
 	}

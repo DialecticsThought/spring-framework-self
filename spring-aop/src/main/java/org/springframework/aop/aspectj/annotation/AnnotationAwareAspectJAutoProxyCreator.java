@@ -45,6 +45,14 @@ import org.springframework.util.Assert;
  * @author Juergen Hoeller
  * @since 2.0
  * @see org.springframework.aop.aspectj.annotation.AspectJAdvisorFactory
+ * <pre>
+ * TODO
+ *  先来看看AnnotationAwareAspectJAutoProxyCreator的继承关系：
+ *  AnnotationAwareAspectJAutoProxyCreator
+ *         ==> 继承自AspectJAwareAdvisorAutoProxyCreator
+ *                 ==> 继承自AbstractAdvisorAutoProxyCreator
+ *                         ==> 继承自AbstractAutoProxyCreator
+ * </pre>
  */
 @SuppressWarnings("serial")
 public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorAutoProxyCreator {

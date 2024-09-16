@@ -120,11 +120,14 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Import(AspectJAutoProxyRegistrar.class)
+// 引入AspectJAutoProxyRegistrar，利用AspectJAutoProxyRegistrar注册一些Bea
 public @interface EnableAspectJAutoProxy {
 
 	/**
 	 * Indicate whether subclass-based (CGLIB) proxies are to be created as opposed
 	 * to standard Java interface-based proxies. The default is {@code false}.
+	 * 控制是基于subclass-based的CGLIB动态代理还是使用基于接口的JDK动态代理
+	 * 默认值为false,即默认使用JDK动态代理方式
 	 */
 	boolean proxyTargetClass() default false;
 
@@ -133,6 +136,9 @@ public @interface EnableAspectJAutoProxy {
 	 * for retrieval via the {@link org.springframework.aop.framework.AopContext} class.
 	 * Off by default, i.e. no guarantees that {@code AopContext} access will work.
 	 * @since 4.3.1
+	 * 控制代理的暴露方式,解决类内部方法之间调用不能使用代理的场景
+	 * 默认值为false，如果设置为true的话，我们就可以通过AopContext.currentProxy()很容易拿到当前代理对象
+	 * 这在解决Spring事务失效的方法自调用场景下很有用；
 	 */
 	boolean exposeProxy() default false;
 
