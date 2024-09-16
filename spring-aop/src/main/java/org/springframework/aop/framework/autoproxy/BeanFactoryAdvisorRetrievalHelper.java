@@ -35,8 +35,8 @@ import org.springframework.util.Assert;
  * for use with auto-proxying.
  *
  * @author Juergen Hoeller
- * @since 2.0.2
  * @see AbstractAdvisorAutoProxyCreator
+ * @since 2.0.2
  */
 public class BeanFactoryAdvisorRetrievalHelper {
 
@@ -50,6 +50,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 
 	/**
 	 * Create a new BeanFactoryAdvisorRetrievalHelper for the given BeanFactory.
+	 *
 	 * @param beanFactory the ListableBeanFactory to scan
 	 */
 	public BeanFactoryAdvisorRetrievalHelper(ConfigurableListableBeanFactory beanFactory) {
@@ -61,6 +62,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 	/**
 	 * Find all eligible Advisor beans in the current bean factory,
 	 * ignoring FactoryBeans and excluding beans that are currently in creation.
+	 *
 	 * @return the list of {@link org.springframework.aop.Advisor} beans
 	 * @see #isEligibleBean
 	 * TODO 获取所有符合条件的Advisor增强器，会忽略FactoryBeans以及正在创建中的bean
@@ -91,19 +93,18 @@ public class BeanFactoryAdvisorRetrievalHelper {
 		//TODO  4.循环遍历前面确定好的增强器对应的beanName集合，确定切面与当前beanName是否符合
 		for (String name : advisorNames) {
 			// isEligibleBean(): 确定切面与当前beanName是否符合，默认都是true
+			// 判断 Advisor 类型的Bean 是否符合要求， 最原始的实现 是默认返回true
 			if (isEligibleBean(name)) {
 				// 5.如果当前bean正在创建中的话，什么都不处理
 				if (this.beanFactory.isCurrentlyInCreation(name)) {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Skipping currently created advisor '" + name + "'");
 					}
-				}
-				else {
+				} else {
 					try {
 						// 6.根据beanName从工厂中获取对应的bean对象，并添加到advisors集合中
 						advisors.add(this.beanFactory.getBean(name, Advisor.class));
-					}
-					catch (BeanCreationException ex) {
+					} catch (BeanCreationException ex) {
 						Throwable rootCause = ex.getMostSpecificCause();
 						if (rootCause instanceof BeanCurrentlyInCreationException) {
 							BeanCreationException bce = (BeanCreationException) rootCause;
@@ -129,6 +130,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 	/**
 	 * Determine whether the aspect bean with the given name is eligible.
 	 * <p>The default implementation always returns {@code true}.
+	 *
 	 * @param beanName the name of the aspect bean
 	 * @return whether the bean is eligible
 	 */
