@@ -115,6 +115,7 @@ public class InjectionMetadata {
 		Collection<InjectedElement> elementsToIterate =
 				(checkedElements != null ? checkedElements : this.injectedElements);
 		if (!elementsToIterate.isEmpty()) {
+			// 循环elementsToIterate, 挨个调用InjectionMetadata.InjectedElement.inject方法，通过反射方式设置属性的值
 			for (InjectedElement element : elementsToIterate) {
 				element.inject(target, beanName, pvs);
 			}

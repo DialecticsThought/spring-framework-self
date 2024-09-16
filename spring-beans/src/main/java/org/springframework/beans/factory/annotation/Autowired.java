@@ -98,14 +98,17 @@ import java.lang.annotation.Target;
  * @see Qualifier
  * @see Value
  */
+// TODO 查看 AutowiredAnnotationBeanPostProcessor
+// 可作用于: 构造方法、普通方法、参数、字段、注解上
 @Target({ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.ANNOTATION_TYPE})
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
+@Retention(RetentionPolicy.RUNTIME)// 保留策略是运行时
+@Documented// @Documented: 表明是否在java doc中添加Annotation
 public @interface Autowired {
 
 	/**
 	 * Declares whether the annotated dependency is required.
 	 * <p>Defaults to {@code true}.
+	 * 声明这个依赖是否必须，默认为true
 	 */
 	boolean required() default true;
 
