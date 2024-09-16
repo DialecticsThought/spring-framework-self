@@ -50,8 +50,20 @@ import org.springframework.util.Assert;
  *  先来看看AnnotationAwareAspectJAutoProxyCreator的继承关系：
  *  AnnotationAwareAspectJAutoProxyCreator
  *         ==> 继承自AspectJAwareAdvisorAutoProxyCreator
- *                 ==> 继承自AbstractAdvisorAutoProxyCreator
+ *                 ==> 继承自AbstractAdvisorAutoProxyCreator 查看 其 setBeanFactory()方法
  *                         ==> 继承自AbstractAutoProxyCreator
+ *  postProcessBeforeInstantiation()：在目标对象实例化之前调用，该方法的返回值类型是Object，
+ *  	我们可以返回任何类型的值。由于这个时候目标对象还未实例化，
+ *  	所以这个返回值可以用来代替原本该生成的目标对象的实例(比如代理对象)。
+ *  	如果该方法的返回值代替原本该生成的目标对象，后续只有postProcessAfterInitialization方法会调用，
+ *  	其它方法不再调用；否则按照正常的流程走；
+ *  postProcessAfterInstantiation()：在目标对象实例化之后调用，这个时候对象已经被实例化，但是该实例的属性还未被设置，都是null；
+ *  查看四个类的源码
+ *  AnnotationAwareAspectJAutoProxyCreator
+ *         ==> AspectJAwareAdvisorAutoProxyCreator
+ *                 ==> AbstractAdvisorAutoProxyCreator
+ *                         ==> AbstractAutoProxyCreator
+ *  发现只有根父类--- AbstractAutoProxyCreator实现了postProcessBeforeInstantiation()、postProcessAfterInstantiation()方法
  * </pre>
  */
 @SuppressWarnings("serial")
@@ -85,10 +97,12 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 
 	@Override
 	protected void initBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+		// 调用间接父类（AbstractAdvisorAutoProxyCreator）的initBeanFactory()方法初始化通知者检索帮助类
 		super.initBeanFactory(beanFactory);
 		if (this.aspectJAdvisorFactory == null) {
 			this.aspectJAdvisorFactory = new ReflectiveAspectJAdvisorFactory(beanFactory);
 		}
+		// 实例化增强器构建器对象
 		this.aspectJAdvisorsBuilder =
 				new BeanFactoryAspectJAdvisorsBuilderAdapter(beanFactory, this.aspectJAdvisorFactory);
 	}
@@ -97,9 +111,12 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 	@Override
 	protected List<Advisor> findCandidateAdvisors() {
 		// Add all the Spring advisors found according to superclass rules.
+		// 1.调用父类AbstractAdvisorAutoProxyCreator.findCandidateAdvisors()方法找到所有候选的增强器（通知方法）
 		List<Advisor> advisors = super.findCandidateAdvisors();
 		// Build Advisors for all AspectJ aspects in the bean factory.
+		// 2.为bean工厂中的所有的AspectJ切面构建Advisor增强器
 		if (this.aspectJAdvisorsBuilder != null) {
+			// TODO 进入
 			advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
 		}
 		return advisors;
@@ -115,6 +132,9 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 		// proxied by that interface and fail at runtime as the advice method is not
 		// defined on the interface. We could potentially relax the restriction about
 		// not advising aspects in the future.
+
+		// isInfrastructureClass():判断当前正在创建的Bean是否是基础的Bean（Advice、PointCut、Advisor、AopInfrastructureBean）
+		// 或者是否是切面（@Aspect）
 		return (super.isInfrastructureClass(beanClass) ||
 				(this.aspectJAdvisorFactory != null && this.aspectJAdvisorFactory.isAspect(beanClass)));
 	}

@@ -57,15 +57,20 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 
 	@Override
 	public void setBeanFactory(BeanFactory beanFactory) {
+		// 调用父类（AbstractAutoProxyCreator）的setBeanFactory()方法给beanFactory属性赋值
 		super.setBeanFactory(beanFactory);
 		if (!(beanFactory instanceof ConfigurableListableBeanFactory)) {
 			throw new IllegalArgumentException(
 					"AdvisorAutoProxyCreator requires a ConfigurableListableBeanFactory: " + beanFactory);
 		}
+		// 调用initBeanFactory来初始化通知者检索帮助类
+		// TODO 进入 AspectAdvisorAutoProxyCreator 的 initBeanFactory
+		// TODO   进入 AnnotationAwareAspectJAutoProxyCreator 的 initBeanFactory
 		initBeanFactory((ConfigurableListableBeanFactory) beanFactory);
 	}
 
 	protected void initBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+		// 初始化通知者检索帮助类
 		this.advisorRetrievalHelper = new BeanFactoryAdvisorRetrievalHelperAdapter(beanFactory);
 	}
 
@@ -108,6 +113,8 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	 */
 	protected List<Advisor> findCandidateAdvisors() {
 		Assert.state(this.advisorRetrievalHelper != null, "No BeanFactoryAdvisorRetrievalHelper available");
+		// 获取所有候选的Advisor增强器集合
+		// TODO 进入
 		return this.advisorRetrievalHelper.findAdvisorBeans();
 	}
 

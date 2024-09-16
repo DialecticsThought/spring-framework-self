@@ -63,24 +63,36 @@ public class BeanFactoryAdvisorRetrievalHelper {
 	 * ignoring FactoryBeans and excluding beans that are currently in creation.
 	 * @return the list of {@link org.springframework.aop.Advisor} beans
 	 * @see #isEligibleBean
+	 * TODO 获取所有符合条件的Advisor增强器，会忽略FactoryBeans以及正在创建中的bean
 	 */
 	public List<Advisor> findAdvisorBeans() {
 		// Determine list of advisor bean names, if not cached already.
+		// 1.保存增强器对应的beanName集合，并将cachedAdvisorBeanNames缓存的值赋值给它
 		String[] advisorNames = this.cachedAdvisorBeanNames;
+
+		// 2.如果cachedAdvisorBeanNames缓存为空，则从bean工厂中获取class类型为Advisor的所有bean名称
 		if (advisorNames == null) {
 			// Do not initialize FactoryBeans here: We need to leave all regular beans
 			// uninitialized to let the auto-proxy creator apply to them!
 			advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 					this.beanFactory, Advisor.class, true, false);
+
+			// 3.存入缓存中
 			this.cachedAdvisorBeanNames = advisorNames;
 		}
+
+		// 如果advisorNames是空的，直接返回空集合
 		if (advisorNames.length == 0) {
 			return new ArrayList<>();
 		}
 
 		List<Advisor> advisors = new ArrayList<>();
+
+		//TODO  4.循环遍历前面确定好的增强器对应的beanName集合，确定切面与当前beanName是否符合
 		for (String name : advisorNames) {
+			// isEligibleBean(): 确定切面与当前beanName是否符合，默认都是true
 			if (isEligibleBean(name)) {
+				// 5.如果当前bean正在创建中的话，什么都不处理
 				if (this.beanFactory.isCurrentlyInCreation(name)) {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Skipping currently created advisor '" + name + "'");
@@ -88,6 +100,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 				}
 				else {
 					try {
+						// 6.根据beanName从工厂中获取对应的bean对象，并添加到advisors集合中
 						advisors.add(this.beanFactory.getBean(name, Advisor.class));
 					}
 					catch (BeanCreationException ex) {
