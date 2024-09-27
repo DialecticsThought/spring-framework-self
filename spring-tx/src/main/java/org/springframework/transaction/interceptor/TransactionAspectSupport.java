@@ -377,48 +377,73 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 											 final InvocationCallback invocation) throws Throwable {
 
 		// If the transaction attribute is null, the method is non-transactional.
+		// 获取事务属性源
 		TransactionAttributeSource tas = getTransactionAttributeSource();
+		//获取事务属性 定义了事务的行为，如传播性、隔离级别和回滚规则 如果事务属性是 null，说明这个方法是非事务性的
+		// TODO 进去
+		//  org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource.getTransactionAttribute
 		final TransactionAttribute txAttr = (tas != null ? tas.getTransactionAttribute(method, targetClass) : null);
+		// 根据获取到的事务属性 txAttr，调用 determineTransactionManager() 来决定使用哪个事务管理器 (TransactionManager)。
+		// Spring 支持不同类型的事务管理器（例如 JDBC 事务管理器、JPA 事务管理器，或响应式事务管理器）
 		final TransactionManager tm = determineTransactionManager(txAttr);
-
+		// this.reactiveAdapterRegistry != null：编程式适配器注册表不为空
+		// tm instanceof ReactiveTransactionManager：是否是编程式事务管理器
+		// 检查 reactiveAdapterRegistry 是否存在（说明支持响应式编程）以及 tm 是否是 ReactiveTransactionManager 实例（说明这是一个响应式事务管理器）。
+		// 如果是，则进入响应式事务处理的逻辑
 		if (this.reactiveAdapterRegistry != null && tm instanceof ReactiveTransactionManager) {
+			// Spring 使用缓存来优化事务管理性能，
+			// 检查当前方法是否已经存在 ReactiveTransactionSupport（这是一个帮助类，用于在响应式上下文中处理事务）。
+			// 如果缓存中不存在这个方法的 txSupport，则会创建并缓存它
 			ReactiveTransactionSupport txSupport = this.transactionSupportCache.computeIfAbsent(method, key -> {
+				// 如果该方法是 Kotlin 的挂起函数（suspend function），Spring 不支持对这种方法直接应用注解式事务。
+				// 因此，如果检测到这种情况，抛出一个 TransactionUsageException 异常
 				if (KotlinDetector.isKotlinType(method.getDeclaringClass()) && KotlinDelegate.isSuspend(method)) {
 					throw new TransactionUsageException(
 							"Unsupported annotated transaction on suspending function detected: " + method +
 									". Use TransactionalOperator.transactional extensions instead.");
 				}
+				// 检查方法的返回类型是否是响应式的（比如 Mono 或 Flux 等）。如果返回类型不是响应式类型，而我们却尝试在其上应用响应式事务，抛出异常
 				ReactiveAdapter adapter = this.reactiveAdapterRegistry.getAdapter(method.getReturnType());
 				if (adapter == null) {
 					throw new IllegalStateException("Cannot apply reactive transaction to non-reactive return type: " +
 							method.getReturnType());
 				}
+				// 如果缓存中没有找到支持类，则创建一个 ReactiveTransactionSupport 实例，并将其与适配器关联，用于后续的事务操作
 				return new ReactiveTransactionSupport(adapter);
 			});
+			// 最后，通过 txSupport.invokeWithinTransaction 在响应式事务上下文中执行目标方法（业务逻辑），同时传递事务属性和响应式事务管理器
 			return txSupport.invokeWithinTransaction(
 					method, targetClass, invocation, txAttr, (ReactiveTransactionManager) tm);
 		}
-
+		// 如果事务管理器不是响应式的，则将其转换为 PlatformTransactionManager，这是标准的声明式事务管理器
 		PlatformTransactionManager ptm = asPlatformTransactionManager(tm);
+		// 构建一个字符串，用于标识当前方法的切点（通常是“类名.方法名”）。这是为日志和调试准备的，便于事务处理时知道具体操作的上下文
 		final String joinpointIdentification = methodIdentification(method, targetClass, txAttr);
 
+		// 检查事务属性 txAttr 是否为空，或者事务管理器是否不支持回调。如果是这种情况，则说明我们需要执行标准的事务管理流程（非回调式）
 		if (txAttr == null || !(ptm instanceof CallbackPreferringPlatformTransactionManager)) {
 			// Standard transaction demarcation with getTransaction and commit/rollback calls.
+			// 创建事务上下文，返回一个 TransactionInfo 对象，表示当前事务的所有相关信息。
+			// 如果事务是必须的（基于事务属性的传播行为），这个方法会开始事务
 			TransactionInfo txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);
 
 			Object retVal;
 			try {
 				// This is an around advice: Invoke the next interceptor in the chain.
 				// This will normally result in a target object being invoked.
+				//通过回调执行目标方法 也就是执行业务逻辑
 				retVal = invocation.proceedWithInvocation();
 			} catch (Throwable ex) {
 				// target invocation exception
+				//在方法出现异常的情况下完成事务 也就是异常回滚
 				completeTransactionAfterThrowing(txInfo, ex);
 				throw ex;
 			} finally {
+
+				// 无论成功与否，调用 cleanupTransactionInfo() 清理线程局部变量中保存的事务信息，防止内存泄漏
 				cleanupTransactionInfo(txInfo);
 			}
-
+			// 如果返回值是 Vavr 的 Try 类型（用于函数式编程），Spring 将根据事务属性来检查是否应该根据 Try 的状态（成功或失败）来设置事务回滚标记
 			if (retVal != null && vavrPresent && VavrDelegate.isVavrTry(retVal)) {
 				// Set rollback-only in case of Vavr failure matching our rollback rules...
 				TransactionStatus status = txInfo.getTransactionStatus();
@@ -426,19 +451,28 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 					retVal = VavrDelegate.evaluateTryFailure(retVal, txAttr, status);
 				}
 			}
-
+			// 提交事务，并返回业务逻辑的返回值 retVal
 			commitTransactionAfterReturning(txInfo);
 			return retVal;
 		} else {
+			// 如果事务管理器支持回调（CallbackPreferringPlatformTransactionManager），
+			// 则进入回调式事务处理逻辑。同时，创建一个 ThrowableHolder 用于暂存异常
+
+
 			Object result;
 			final ThrowableHolder throwableHolder = new ThrowableHolder();
 
 			// It's a CallbackPreferringPlatformTransactionManager: pass a TransactionCallback in.
 			try {
+				// 通过回调方式执行事务
 				result = ((CallbackPreferringPlatformTransactionManager) ptm).execute(txAttr, status -> {
+					// 准备事务上下文，执行目标业务逻辑
 					TransactionInfo txInfo = prepareTransactionInfo(ptm, txAttr, joinpointIdentification, status);
 					try {
+						// 通过 invocation.proceedWithInvocation() 执行目标方法，返回值存储在 retVal 中
 						Object retVal = invocation.proceedWithInvocation();
+
+						// 如果返回值是 Vavr 的 Try 类型，评估它的失败情况，并根据事务规则设置为回滚
 						if (retVal != null && vavrPresent && VavrDelegate.isVavrTry(retVal)) {
 							// Set rollback-only in case of Vavr failure matching our rollback rules...
 							retVal = VavrDelegate.evaluateTryFailure(retVal, txAttr, status);
@@ -458,18 +492,19 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 							return null;
 						}
 					} finally {
+						//清除缓存中的事务信息 为下一个事务做好准备
 						cleanupTransactionInfo(txInfo);
 					}
 				});
-			} catch (ThrowableHolderException ex) {
+			} catch (ThrowableHolderException ex) {// 如果捕获到这个异常，抛出其根本原因
 				throw ex.getCause();
-			} catch (TransactionSystemException ex2) {
+			} catch (TransactionSystemException ex2) {// 如果有应用程序异常，记录错误并将其初始化到 TransactionSystemException 中
 				if (throwableHolder.throwable != null) {
 					logger.error("Application exception overridden by commit exception", throwableHolder.throwable);
 					ex2.initApplicationException(throwableHolder.throwable);
 				}
 				throw ex2;
-			} catch (Throwable ex2) {
+			} catch (Throwable ex2) {// 最后检查 throwableHolder 中是否有异常，如果有则抛出该异常。否则，返回正常结果
 				if (throwableHolder.throwable != null) {
 					logger.error("Application exception overridden by commit exception", throwableHolder.throwable);
 				}
