@@ -385,6 +385,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 		final TransactionAttribute txAttr = (tas != null ? tas.getTransactionAttribute(method, targetClass) : null);
 		// 根据获取到的事务属性 txAttr，调用 determineTransactionManager() 来决定使用哪个事务管理器 (TransactionManager)。
 		// Spring 支持不同类型的事务管理器（例如 JDBC 事务管理器、JPA 事务管理器，或响应式事务管理器）
+		// TODO
 		final TransactionManager tm = determineTransactionManager(txAttr);
 		// this.reactiveAdapterRegistry != null：编程式适配器注册表不为空
 		// tm instanceof ReactiveTransactionManager：是否是编程式事务管理器
@@ -533,19 +534,29 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 	@Nullable
 	protected TransactionManager determineTransactionManager(@Nullable TransactionAttribute txAttr) {
 		// Do not attempt to lookup tx manager if no tx attributes are set
+		/**
+		 * 检查事务属性和 bean 工厂：
+		 * 如果 txAttr 为 null 或 beanFactory 为 null，
+		 * 则不尝试查找事务管理器，直接调用 getTransactionManager() 返回默认的事务管理器
+		 */
 		if (txAttr == null || this.beanFactory == null) {
 			return getTransactionManager();
 		}
-
+		// 从 txAttr 中获取事务管理器的限定符（qualifier），这是用于查找特定事务管理器的标识
 		String qualifier = txAttr.getQualifier();
+		// 如果限定符不为空，则调用 determineQualifiedTransactionManager 方法，使用 beanFactory 和 qualifier 查找特定的事务管理器并返回
 		if (StringUtils.hasText(qualifier)) {
 			return determineQualifiedTransactionManager(this.beanFactory, qualifier);
 		} else if (StringUtils.hasText(this.transactionManagerBeanName)) {
+			// 如果 transactionManagerBeanName 也不为空，则使用该名称调用 determineQualifiedTransactionManager 查找事务管理器并返回。
 			return determineQualifiedTransactionManager(this.beanFactory, this.transactionManagerBeanName);
 		} else {
+			// 如果以上条件都不满足，则调用 getTransactionManager() 获取默认的事务管理器
 			TransactionManager defaultTransactionManager = getTransactionManager();
+			// 如果默认事务管理器仍为 null，则从缓存中获取与 DEFAULT_TRANSACTION_MANAGER_KEY 关联的事务管理器
 			if (defaultTransactionManager == null) {
 				defaultTransactionManager = this.transactionManagerCache.get(DEFAULT_TRANSACTION_MANAGER_KEY);
+				// 如果缓存中仍然没有找到事务管理器，则从 beanFactory 获取 TransactionManager 类型的 bean，并将其放入缓存中（如果缓存中尚不存在）
 				if (defaultTransactionManager == null) {
 					defaultTransactionManager = this.beanFactory.getBean(TransactionManager.class);
 					this.transactionManagerCache.putIfAbsent(
