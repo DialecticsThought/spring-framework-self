@@ -542,7 +542,18 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 		if (txAttr == null || this.beanFactory == null) {
 			return getTransactionManager();
 		}
-		// 从 txAttr 中获取事务管理器的限定符（qualifier），这是用于查找特定事务管理器的标识
+		/**
+		 * 从 txAttr 中获取事务管理器的限定符（qualifier），这是用于查找特定事务管理器的标识
+		 * qualifier 属性通常用于指定要使用的特定事务管理器的名称
+		 * 假设你有多个数据源和对应的事务管理器，
+		 * 比如一个用于 MySQL 的事务管理器和一个用于 Oracle 的事务管理器。
+		 * 在 @Transactional 注解中，你可以指定事务管理器的名称，如下所示：
+		 *
+		 * @Transactional(transactionManager = "mysqlTransactionManager")
+		 * public void someDatabaseOperation() {
+		 *     // 该方法将使用名为 "mysqlTransactionManager" 的事务管理器
+		 * }
+		 */
 		String qualifier = txAttr.getQualifier();
 		// 如果限定符不为空，则调用 determineQualifiedTransactionManager 方法，使用 beanFactory 和 qualifier 查找特定的事务管理器并返回
 		if (StringUtils.hasText(qualifier)) {
