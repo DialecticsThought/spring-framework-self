@@ -56,6 +56,7 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 	/**
 	 * Create a new TransactionInterceptor.
 	 * <p>Transaction manager and transaction attributes still need to be set.
+	 *
 	 * @see #setTransactionManager
 	 * @see #setTransactionAttributes(java.util.Properties)
 	 * @see #setTransactionAttributeSource(TransactionAttributeSource)
@@ -65,11 +66,12 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
 	/**
 	 * Create a new TransactionInterceptor.
+	 *
 	 * @param ptm the default transaction manager to perform the actual transaction management
 	 * @param tas the attribute source to be used to find transaction attributes
-	 * @since 5.2.5
 	 * @see #setTransactionManager
 	 * @see #setTransactionAttributeSource
+	 * @since 5.2.5
 	 */
 	public TransactionInterceptor(TransactionManager ptm, TransactionAttributeSource tas) {
 		setTransactionManager(ptm);
@@ -78,6 +80,7 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
 	/**
 	 * Create a new TransactionInterceptor.
+	 *
 	 * @param ptm the default transaction manager to perform the actual transaction management
 	 * @param tas the attribute source to be used to find transaction attributes
 	 * @see #setTransactionManager
@@ -93,7 +96,8 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
 	/**
 	 * Create a new TransactionInterceptor.
-	 * @param ptm the default transaction manager to perform the actual transaction management
+	 *
+	 * @param ptm        the default transaction manager to perform the actual transaction management
 	 * @param attributes the transaction attributes in properties format
 	 * @see #setTransactionManager
 	 * @see #setTransactionAttributes(java.util.Properties)
@@ -106,15 +110,26 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 	}
 
 
+	/**
+	 * 核心方法 通过 AOP 拦截 Spring 声明式事务
+	 *
+	 * @param invocation the method invocation joinpoint
+	 * @return
+	 * @throws Throwable
+	 */
 	@Override
 	@Nullable
 	public Object invoke(MethodInvocation invocation) throws Throwable {
 		// Work out the target class: may be {@code null}.
 		// The TransactionAttributeSource should be passed the target class
 		// as well as the method, which may be from an interface.
+
+		// TODO 获取 targetClass 也就是被代理的类的 Class
 		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
 
 		// Adapt to TransactionAspectSupport's invokeWithinTransaction...
+		// TODO 调用 TransactionAspectSupport 的 invokeWithinTransaction 方法
+		// TODO invocation::proceed就是执行目标方法
 		return invokeWithinTransaction(invocation.getMethod(), targetClass, invocation::proceed);
 	}
 

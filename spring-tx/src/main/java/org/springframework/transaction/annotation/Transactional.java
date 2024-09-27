@@ -77,6 +77,8 @@ public @interface Transactional {
 	/**
 	 * Alias for {@link #transactionManager}.
 	 * @see #transactionManager
+	 *
+	 * TODO 可以指定使用某个事务管理器
 	 */
 	@AliasFor("transactionManager")
 	String value() default "";
@@ -91,6 +93,8 @@ public @interface Transactional {
 	 * @see #value
 	 * @see org.springframework.transaction.PlatformTransactionManager
 	 * @see org.springframework.transaction.ReactiveTransactionManager
+	 *
+	 *
 	 */
 	@AliasFor("value")
 	String transactionManager() default "";
@@ -99,6 +103,8 @@ public @interface Transactional {
 	 * The transaction propagation type.
 	 * <p>Defaults to {@link Propagation#REQUIRED}.
 	 * @see org.springframework.transaction.interceptor.TransactionAttribute#getPropagationBehavior()
+	 *
+	 * TODO 默认事务传播行为 当前存在一个事务 则加入当前事务 如果不存在任何事务 则创建一个新的事务 总之 要至少保证在一个事
 	 */
 	Propagation propagation() default Propagation.REQUIRED;
 
@@ -113,6 +119,8 @@ public @interface Transactional {
 	 * isolation level.
 	 * @see org.springframework.transaction.interceptor.TransactionAttribute#getIsolationLevel()
 	 * @see org.springframework.transaction.support.AbstractPlatformTransactionManager#setValidateExistingTransaction
+	 *
+	 * TODO 默认的事务隔离级别 Isolation.DEFAULT 是使用数据库的默认隔离级别
 	 */
 	Isolation isolation() default Isolation.DEFAULT;
 
@@ -123,6 +131,8 @@ public @interface Transactional {
 	 * {@link Propagation#REQUIRES_NEW} since it only applies to newly started
 	 * transactions.
 	 * @see org.springframework.transaction.interceptor.TransactionAttribute#getTimeout()
+	 *
+	 * TODO 事务超时时间设置
 	 */
 	int timeout() default TransactionDefinition.TIMEOUT_DEFAULT;
 
@@ -137,6 +147,8 @@ public @interface Transactional {
 	 * but rather silently ignore the hint.
 	 * @see org.springframework.transaction.interceptor.TransactionAttribute#isReadOnly()
 	 * @see org.springframework.transaction.support.TransactionSynchronizationManager#isCurrentTransactionReadOnly()
+	 *
+	 * TODO 读写或只读事务，默认读写
 	 */
 	boolean readOnly() default false;
 
@@ -153,6 +165,8 @@ public @interface Transactional {
 	 * <p>Similar to {@link org.springframework.transaction.interceptor.RollbackRuleAttribute#RollbackRuleAttribute(Class clazz)}.
 	 * @see #rollbackForClassName
 	 * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
+	 *
+	 * TODO 导致事务回滚的异常数组
 	 */
 	Class<? extends Throwable>[] rollbackFor() default {};
 
@@ -186,6 +200,8 @@ public @interface Transactional {
 	 * <p>Similar to {@link org.springframework.transaction.interceptor.NoRollbackRuleAttribute#NoRollbackRuleAttribute(Class clazz)}.
 	 * @see #noRollbackForClassName
 	 * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute#rollbackOn(Throwable)
+	 *
+	 * TODO 不会导致事务回滚的异常类名字数组
 	 */
 	Class<? extends Throwable>[] noRollbackFor() default {};
 
