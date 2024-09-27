@@ -185,6 +185,8 @@ public class AnnotationTransactionAttributeSource extends AbstractFallbackTransa
 		for (TransactionAnnotationParser parser : this.annotationParsers) {
 			// 调用当前解析器的 parseTransactionAnnotation 方法，
 			// 尝试从给定的注解元素中解析出事务属性。如果该元素上有相关的事务注解，返回的 attr 将包含相应的属性
+			// TODO 进入
+			//  org.springframework.transaction.annotation.SpringTransactionAnnotationParser.parseTransactionAnnotation(java.lang.reflect.AnnotatedElement)
 			TransactionAttribute attr = parser.parseTransactionAnnotation(element);
 			// 如果解析成功（即 attr 不为 null），立即返回该事务属性，表示找到相关的事务配置
 			if (attr != null) {
