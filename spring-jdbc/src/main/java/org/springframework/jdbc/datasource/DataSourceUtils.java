@@ -254,19 +254,26 @@ public abstract class DataSourceUtils {
 		boolean debugEnabled = logger.isDebugEnabled();
 		try {
 			// Reset transaction isolation to previous value, if changed for the transaction.
+			// 检查事务开始前的隔离级别是否不为 null
+			// 如果 null，表示隔离级别没有在事务中更改，无需重置
 			if (previousIsolationLevel != null) {
 				if (debugEnabled) {
 					logger.debug("Resetting isolation level of JDBC Connection [" +
 							con + "] to " + previousIsolationLevel);
 				}
+				// 调用 JDBC 连接对象的 setTransactionIsolation() 方法，将事务的隔离级别重置为事务开始前的级别 previousIsolationLevel
 				con.setTransactionIsolation(previousIsolationLevel);
 			}
 
 			// Reset read-only flag if we originally switched it to true on transaction begin.
-			if (resetReadOnly) {
+
+			// 如果 resetReadOnly 为 true，表示在事务中将连接设置为只读，现在需要将其重置为非只读
+			if (resetReadOnly) {// 检查是否需要重置只读状态
 				if (debugEnabled) {
 					logger.debug("Resetting read-only flag of JDBC Connection [" + con + "]");
 				}
+				// 调用 setReadOnly(false) 方法，将连接的只读状态设置为 false。
+				// 这通常是在事务开始时，Spring 将连接标记为只读，现在需要将其恢复
 				con.setReadOnly(false);
 			}
 		}

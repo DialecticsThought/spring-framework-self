@@ -753,13 +753,13 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 *
 	 * @param transaction the current transaction object
 	 *                    (or {@code null} to just suspend active synchronizations, if any)
-	 *                    TODO 需要挂起的事务对象，可能为 null
+	 *                                       TODO 需要挂起的事务对象，可能为 null
 	 * @return an object that holds suspended resources
 	 * 			TODO 返回一个 SuspendedResourcesHolder 对象，封装了挂起的资源、同步信息、事务名称、只读状态等
 	 * (or {@code null} if neither transaction nor synchronization active)
 	 * @see #doSuspend
 	 * @see #resume
-	 *
+	 * <p>
 	 * TODO 方法目的：挂起当前事务和事务同步（如果有），并将当前事务的相关状态信息保存到 SuspendedResourcesHolder 中，方便后续恢复。
 	 */
 	@Nullable
@@ -827,26 +827,48 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 * template method first, then resuming transaction synchronization.
 	 *
 	 * @param transaction     the current transaction object
+	 *                           TODO 前正在运行的事务对象，可能是 null
 	 * @param resourcesHolder the object that holds suspended resources,
 	 *                        as returned by {@code suspend} (or {@code null} to just
 	 *                        resume synchronizations, if any)
+	 *                           TODO 持有挂起事务资源的对象，可能包含挂起的资源和事务同步对象，可能为 null
 	 * @see #doResume
 	 * @see #suspend
+	 * TODO
+	 *  方法的主要作用是在事务完成（或挂起）后恢复事务的上下文和资源。
+	 *  这通常用于恢复之前被挂起的事务资源，例如在嵌套事务或事务传播规则为 PROPAGATION_REQUIRES_NEW 时。
+	 *  当一个新的事务完成后，可能需要恢复之前的挂起事务
 	 */
 	protected final void resume(@Nullable Object transaction, @Nullable SuspendedResourcesHolder resourcesHolder)
 			throws TransactionException {
-
+		// resourcesHolder 是 SuspendedResourcesHolder 类型，它封装了在事务挂起时保存的事务同步和资源
+		// 如果为 null，则表示没有挂起的资源需要恢复，方法结束
 		if (resourcesHolder != null) {
+			// 获取挂起的资源（如数据库连接、文件句柄等）。这些资源在事务挂起时被保存起来，以便事务完成后恢复
 			Object suspendedResources = resourcesHolder.suspendedResources;
 			if (suspendedResources != null) {
+				// 调用 doResume() 方法恢复这些挂起的资源
+				// doResume 是一个模板方法
+				// TODO 进入
 				doResume(transaction, suspendedResources);
 			}
+			// 获取挂起时保存的事务同步回调对象。
+			// 这些回调对象通常用于管理事务的生命周期，例如在事务提交或回滚时执行特定的操作
 			List<TransactionSynchronization> suspendedSynchronizations = resourcesHolder.suspendedSynchronizations;
 			if (suspendedSynchronizations != null) {
+				// resourcesHolder.wasActive：指示在事务挂起之前，事务是否处于活动状态（即事务是否正在进行中）
+				// 将事务的活动状态恢复为挂起之前的状态。如果挂起之前事务处于活动状态，则恢复为活动状态；如果没有活动事务，则恢复为非活动状态
 				TransactionSynchronizationManager.setActualTransactionActive(resourcesHolder.wasActive);
+				// resourcesHolder.isolationLevel：保存了事务挂起之前的隔离级别。如果事务中更改了数据库连接的隔离级别，事务挂起时会保存下来
+				// 恢复事务的隔离级别，将其设置为挂起之前的隔离级别
 				TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(resourcesHolder.isolationLevel);
+				// 保存了事务挂起之前的只读状态
+				// 恢复事务的只读状态。如果挂起之前事务是只读的，则恢复为只读状态；否则，恢复为非只读状态
 				TransactionSynchronizationManager.setCurrentTransactionReadOnly(resourcesHolder.readOnly);
+				// 保存了事务挂起之前的事务名称
+				// 将事务名称恢复为挂起之前的名称。事务名称通常用于标识特定的事务
 				TransactionSynchronizationManager.setCurrentTransactionName(resourcesHolder.name);
+				// 恢复挂起的事务同步回调，重新注册这些回调对象，以便它们可以继续参与事务的生命周期管理
 				doResumeSynchronization(suspendedSynchronizations);
 			}
 		}
@@ -910,28 +932,39 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 */
 	@Override
 	public final void commit(TransactionStatus status) throws TransactionException {
+		// 检查事务状态，判断当前事务是否已经完成
+		// 如果事务已经提交或回滚，调用 isCompleted() 会返回 true
 		if (status.isCompleted()) {
 			throw new IllegalTransactionStateException(
 					"Transaction is already completed - do not call commit or rollback more than once per transaction");
 		}
-
+		// DefaultTransactionStatus 是 TransactionStatus 的具体实现类，包含更多关于事务的详细信息和操作方法
 		DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
+		// 检查当前事务是否被标记为只回滚
+		// 这意味着事务内的代码已经显式要求回滚，通常通过 setRollbackOnly() 方法设置
 		if (defStatus.isLocalRollbackOnly()) {
 			if (defStatus.isDebug()) {
 				logger.debug("Transactional code has requested rollback");
 			}
+			// 调用 processRollback(defStatus, false) 执行回滚操作，并结束方法
+			// TODO 进入
 			processRollback(defStatus, false);
 			return;
 		}
-
+		// defStatus.isGlobalRollbackOnly()：检查事务是否在全局范围内被标记为只回滚。
+		// 		这可能是因为外部事务或其他系统原因导致整个事务被标记为回滚。
+		// shouldCommitOnGlobalRollbackOnly()：检查当前事务管理器是否允许在全局回滚标记为 rollback-only 时提交事务。
+		// 		通常情况下，这个值是 false，表示如果事务被标记为全局回滚，则不应提交
 		if (!shouldCommitOnGlobalRollbackOnly() && defStatus.isGlobalRollbackOnly()) {
 			if (defStatus.isDebug()) {
 				logger.debug("Global transaction is marked as rollback-only but transactional code requested commit");
 			}
+			// 调用 processRollback(defStatus, true) 执行回滚操作，并结束方法
 			processRollback(defStatus, true);
 			return;
 		}
-
+		// 如果事务没有被标记为回滚，则调用 processCommit(defStatus) 处理事务的提交过程。
+		// processCommit 方法负责实际的事务提交，包括触发事务同步回调、提交底层事务（如数据库的 commit）、以及处理提交过程中的任何异常
 		processCommit(defStatus);
 	}
 
@@ -1018,12 +1051,31 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 */
 	@Override
 	public final void rollback(TransactionStatus status) throws TransactionException {
+		/**
+		 * 这是 TransactionStatus 接口中的一个方法，用于检查事务是否已经完成（即是否已经提交或回滚）。
+		 * 返回 true 表示事务已经完成，false 表示事务尚未完成
+		 */
 		if (status.isCompleted()) {
+			/**
+			 * 这是一个运行时异常，表示事务状态不合法。
+			 * 异常信息：“Transaction is already completed - do not call commit or rollback more than once per transaction”
+			 * 意味着事务已经完成，不应再次调用 commit 或 rollback
+			 */
 			throw new IllegalTransactionStateException(
 					"Transaction is already completed - do not call commit or rollback more than once per transaction");
 		}
 
+		// 将传入的 TransactionStatus 对象强制转换为 DefaultTransactionStatus 类型
+		// DefaultTransactionStatus 是 TransactionStatus 接口的一个具体实现类，提供了事务的详细状态信息和操作方法
+		// DefaultTransactionStatus 包含了更多内部使用的信息和方法，这些在 rollback 操作中是必要的
 		DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
+		/**
+		 * defStatus：已经转换为 DefaultTransactionStatus 的事务状态对象，包含了事务的详细信息。
+		 * false：这个布尔值通常用于指示是否是由于应用程序异常而进行的回滚。
+		 * 在 Spring 的实现中，第二个参数通常用于表示是否在回滚时抛出异常或进行其他特定处理
+		 *
+		 * TODO 进入
+		 */
 		processRollback(defStatus, false);
 	}
 
@@ -1036,28 +1088,43 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 */
 	private void processRollback(DefaultTransactionStatus status, boolean unexpected) {
 		try {
+			// 将传入的 unexpected 参数赋值给本地变量 unexpectedRollback，用于在方法内部追踪是否发生了意外回滚
 			boolean unexpectedRollback = unexpected;
 
 			try {
+				// 调用 triggerBeforeCompletion(status)，触发事务同步回调中的 beforeCompletion() 方法。
+				// 这些回调是在事务即将完成时（无论提交还是回滚）执行的，通常用于释放资源或进行其他清理操作
 				triggerBeforeCompletion(status);
 
-				if (status.hasSavepoint()) {
+				// 保存点允许部分回滚，即回滚到某个事务点而不是整个事务
+				if (status.hasSavepoint()) {// 检查事务状态是否包含保存点
 					if (status.isDebug()) {
 						logger.debug("Rolling back transaction to savepoint");
 					}
+					// 如果有保存点，调用该方法将事务回滚到保存点
 					status.rollbackToHeldSavepoint();
-				} else if (status.isNewTransaction()) {
+
+				} else if (status.isNewTransaction()) {// 检查事务是否为新事务。如果当前事务是一个新事务（而不是参与现有事务的一部分），执行完整回滚
 					if (status.isDebug()) {
 						logger.debug("Initiating transaction rollback");
 					}
+					// 调用 doRollback 方法执行实际的回滚操作。
+					// doRollback 是一个抽象方法，由具体的事务管理器（如 DataSourceTransactionManager）实现，负责与底层资源（如数据库）的回滚
 					doRollback(status);
 				} else {
 					// Participating in larger transaction
-					if (status.hasTransaction()) {
+					// 如果当前事务不是新事务而是参与到一个更大事务中的子事务，进入这一部分逻辑
+					if (status.hasTransaction()) {// 检查是否存在当前参与的事务
+						// isLocalRollbackOnly() 如果当前事务设置为只回滚本地事务，则执行回滚
+						// isGlobalRollbackOnParticipationFailure()：如果全局回滚标志设置为 true，则标记整个事务为回滚
 						if (status.isLocalRollbackOnly() || isGlobalRollbackOnParticipationFailure()) {
 							if (status.isDebug()) {
 								logger.debug("Participating transaction failed - marking existing transaction as rollback-only");
 							}
+							// 将事务标记为只回滚。这样，虽然事务本身未回滚，但参与的事务标记为回滚状态
+							// 当子事务发生失败时，虽然子事务无法直接回滚整个事务，但可以通过将事务标记为 "只回滚" 来确保最终事务在提交时执行回滚操作
+							// 将当前事务标记为 "只回滚"。这意味着事务在后续将无法提交，只能回滚
+							// TODO 进入 org.springframework.jdbc.datasource.DataSourceTransactionManager.doSetRollbackOnly
 							doSetRollbackOnly(status);
 						} else {
 							if (status.isDebug()) {
@@ -1068,15 +1135,19 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 						logger.debug("Should roll back transaction but cannot - no transaction available");
 					}
 					// Unexpected rollback only matters here if we're asked to fail early
+					// 检查是否在全局回滚标记设置为 rollback-only 时立即失败
 					if (!isFailEarlyOnGlobalRollbackOnly()) {
+						// 如果isFailEarlyOnGlobalRollbackOnly()返回 false，则将 unexpectedRollback 设置为 false，表示回滚不再被视为意外
 						unexpectedRollback = false;
 					}
 				}
 			} catch (RuntimeException | Error ex) {
+				// 首先触发 afterCompletion 回调并将事务状态标记为未知
+				// TODO 进入
 				triggerAfterCompletion(status, TransactionSynchronization.STATUS_UNKNOWN);
 				throw ex;
 			}
-
+			// triggerAfterCompletion(status, TransactionSynchronization.STATUS_ROLLED_BACK)，通知所有已注册的事务同步回调事务已回滚完成
 			triggerAfterCompletion(status, TransactionSynchronization.STATUS_ROLLED_BACK);
 
 			// Raise UnexpectedRollbackException if we had a global rollback-only marker
@@ -1085,6 +1156,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 						"Transaction rolled back because it has been marked as rollback-only");
 			}
 		} finally {
+			// 最终，无论回滚是否成功，调用 cleanupAfterCompletion(status) 清理事务状态。
+			// 该方法会清理事务相关的上下文信息，例如解除线程局部变量的绑定，释放资源等
+			// TODO 进入
 			cleanupAfterCompletion(status);
 		}
 	}
@@ -1165,23 +1239,51 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 * Trigger {@code afterCompletion} callbacks.
 	 *
 	 * @param status           object representing the transaction
+	 *                                                   TODO  当前事务的状态对象，包含了事务的详细信息和属性
 	 * @param completionStatus completion status according to TransactionSynchronization constants
+	 *                                                   TODO 表示事务的完成状态。可以是 STATUS_COMMITTED（提交完成）或 STATUS_ROLLED_BACK（回滚完成
 	 */
 	private void triggerAfterCompletion(DefaultTransactionStatus status, int completionStatus) {
+		// 检查当前事务是否有新的同步回调
+		// 通常是在事务开始时注册了新的同步回调
+		// 确保只有在事务注册了新的同步回调的情况下，才会触发事务完成后的操作
 		if (status.isNewSynchronization()) {
+			// 获取当前线程中已注册的所有同步回调
+			// 一个包含 TransactionSynchronization 对象的列表，这些对象在事务的各个生命周期阶段执行回调
 			List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+			//  清除当前线程中的同步回调信息，表示事务已经完成，清理上下文
 			TransactionSynchronizationManager.clearSynchronization();
-			if (!status.hasTransaction() || status.isNewTransaction()) {
+			// status.hasTransaction()：检查当前事务状态中是否存在实际的事务。如果返回 false，表示当前事务状态下没有绑定事务
+			// status.isNewTransaction()：检查当前事务是否为新事务。如果返回 true，表示这是一个新事务
+			if (!status.hasTransaction() || status.isNewTransaction()) {// 该条件为 true 的场景：当前没有事务或者当前是一个新事务
 				if (status.isDebug()) {
 					logger.trace("Triggering afterCompletion synchronization");
 				}
 				// No transaction or new transaction for the current scope ->
 				// invoke the afterCompletion callbacks immediately
+				/**
+				 * 该方法
+				 * 对每个 TransactionSynchronization 对象调用其 afterCompletion() 方法，执行事务完成后的操作。
+				 * completionStatus 会传递给回调，指示事务是提交完成（STATUS_COMMITTED）还是回滚完成（STATUS_ROLLED_BACK）
+				 */
+				// TODO 进入
 				invokeAfterCompletion(synchronizations, completionStatus);
-			} else if (!synchronizations.isEmpty()) {
+			} else if (!synchronizations.isEmpty()) {// 如果当前事务不是新事务 且存在事务同步回调
 				// Existing transaction that we participate in, controlled outside
 				// of the scope of this Spring transaction manager -> try to register
 				// an afterCompletion callback with the existing (JTA) transaction.
+				/**
+				 * 如果当前事务是参与到一个更大事务（eg: JTA 事务）的一部分，
+				 * 调用 registerAfterCompletionWithExistingTransaction() 方法，
+				 * 将同步回调注册到外部事务中，以便在外部事务完成时触发这些回调。
+				 *
+				 * status.getTransaction()：获取当前参与的事务对象
+				 * synchronizations：传入已注册的同步回调列表，以便在外部事务完成时执行这些回调
+				 * TODO
+				 *  目的：处理当前事务不是独立事务，而是参与到外部事务的情况。
+				 * 	在这种情况下，Spring 无法直接触发 afterCompletion，
+				 * 	而是需要注册回调到外部事务的管理范围内
+				 */
 				registerAfterCompletionWithExistingTransaction(status.getTransaction(), synchronizations);
 			}
 		}
@@ -1210,21 +1312,40 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 * and invoking doCleanupAfterCompletion.
 	 *
 	 * @param status object representing the transaction
+	 *                                TODO 当前事务的状态对象，包含了事务的详细信息，包括事务资源、是否是新事务、是否有挂起的资源等
 	 * @see #doCleanupAfterCompletion
+	 * <p>
+	 * TODO 清理事务完成后（提交或回滚）的上下文信息，释放资源并恢复任何被挂起的事务资源
 	 */
 	private void cleanupAfterCompletion(DefaultTransactionStatus status) {
+		// 调用 status.setCompleted() 将事务状态标记为已完成。
+		// 这个方法会将 DefaultTransactionStatus 中的 completed 标志设置为 true，表示事务已经结束（无论是提交还是回滚）
 		status.setCompleted();
+
+		// 检查事务是否有新注册的同步回调（TransactionSynchronization）。通常这些同步回调会在事务提交或回滚时触发
 		if (status.isNewSynchronization()) {
+			// 如果有新的同步回调，
+			// 调用 TransactionSynchronizationManager.clear() 清理事务同步上下文，包括事务同步回调、当前事务的名称、事务的只读状态等
 			TransactionSynchronizationManager.clear();
 		}
-		if (status.isNewTransaction()) {
+		if (status.isNewTransaction()) {// 检查当前事务是否是一个新事务。新事务是指由当前事务管理器创建并管理的事务，而不是参与到外部事务的事务
+			// 执行具体的清理操作。
+			// doCleanupAfterCompletion 是一个抽象方法，通常由子类实现，用于清理底层资源（如数据库连接、JDBC 事务等）
+			// TODO 进入 org.springframework.jdbc.datasource.DataSourceTransactionManager.doCleanupAfterCompletion
 			doCleanupAfterCompletion(status.getTransaction());
 		}
+		// 检查是否有挂起的事务资源。
+		// 挂起的事务资源通常是当一个事务嵌套在另一个事务中时，外部事务的资源会被暂时挂起（如数据库连接、事务状态等），等内部事务完成后再恢复
 		if (status.getSuspendedResources() != null) {
 			if (status.isDebug()) {
 				logger.debug("Resuming suspended transaction after completion of inner transaction");
 			}
+			// status.hasTransaction()：检查当前事务状态中是否有事务对象。如果有，获取事务对象 status.getTransaction()；
+			// 否则，设置 transaction 为 null
 			Object transaction = (status.hasTransaction() ? status.getTransaction() : null);
+			// 用 resume() 方法恢复挂起的事务资源，resume() 方法会将挂起的资源重新绑定到当前线程中，恢复事务之前的状态
+			// 挂起的资源对象，通常包含事务持有的连接、事务同步等信息
+			// TODO 进入
 			resume(transaction, (SuspendedResourcesHolder) status.getSuspendedResources());
 		}
 	}

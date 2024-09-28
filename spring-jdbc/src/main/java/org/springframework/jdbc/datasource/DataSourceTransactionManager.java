@@ -371,19 +371,34 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		return TransactionSynchronizationManager.unbindResource(obtainDataSource());
 	}
 
+	/**
+	 *
+	 * @param transaction        the transaction object returned by {@code doGetTransaction}
+	 *                              TODO 当前事务对象，可能是 null
+	 * @param suspendedResources the object that holds suspended resources,
+	 *                           as returned by doSuspend
+	 *                           TODO  之前挂起的资源对象（如 ConnectionHolder），在恢复时需要重新绑定到线程中
+	 */
 	@Override
 	protected void doResume(@Nullable Object transaction, Object suspendedResources) {
+		// TODO 进入
+		// bindResource() 的作用是在 ThreadLocal 中保存与数据源相关的资源
+		// suspendedResources 通常是一个 ConnectionHolder 对象，表示事务期间使用的数据库连接
+		// obtainDataSource()：获取与当前事务相关的数据源（DataSource）。
+		// 这是数据源事务管理器中的一个模板方法，负责返回当前管理的数据库连接池或数据源
 		TransactionSynchronizationManager.bindResource(obtainDataSource(), suspendedResources);
 	}
 
 	@Override
 	protected void doCommit(DefaultTransactionStatus status) {
 		DataSourceTransactionObject txObject = (DataSourceTransactionObject) status.getTransaction();
+		//得到数据库连接
 		Connection con = txObject.getConnectionHolder().getConnection();
 		if (status.isDebug()) {
 			logger.debug("Committing JDBC transaction on Connection [" + con + "]");
 		}
 		try {
+			// 提交
 			con.commit();
 		} catch (SQLException ex) {
 			throw new TransactionSystemException("Could not commit JDBC transaction", ex);
@@ -404,44 +419,73 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		}
 	}
 
+	/**
+	 * 参与事务失败：如果当前事务参与了一个更大事务的一部分，当出现错误时，无法直接回滚整个事务，但可以将事务标记为 "只回滚"。
+	 * 事务回滚控制：通过标记为 "只回滚"，可以确保在事务生命周期的最后阶段，不会提交事务，而是执行回滚操作，保持数据的一致性和完整性
+	 * @param status the status representation of the transaction
+	 */
 	@Override
 	protected void doSetRollbackOnly(DefaultTransactionStatus status) {
+		// 从 status 对象中获取当前事务的底层事务对象，并将其转换为 DataSourceTransactionObject 类型
+		// DataSourceTransactionObject 是一个 Spring 特有的类，封装了与 JDBC 事务相关的信息，如数据库连接（ConnectionHolder）等
 		DataSourceTransactionObject txObject = (DataSourceTransactionObject) status.getTransaction();
 		if (status.isDebug()) {
+			// txObject.getConnectionHolder().getConnection() 返回当前事务持有的 JDBC 连接对象
+			// 如果调试模式启用，记录一条日志，日志内容包括将哪个 JDBC 事务（通过数据库连接 Connection）设置为 "只回滚"
 			logger.debug("Setting JDBC transaction [" + txObject.getConnectionHolder().getConnection() +
 					"] rollback-only");
 		}
+		// 调用 txObject.setRollbackOnly()，将当前事务标记为 "只回滚"。
+		// 该方法会将事务对象中的回滚标志设置为 true，
+		// 这样在事务的提交阶段（commit 方法）时，事务管理器会检查这个标志，如果发现事务被标记为回滚，则不会提交事务，而是执行回滚
 		txObject.setRollbackOnly();
 	}
 
 	@Override
 	protected void doCleanupAfterCompletion(Object transaction) {
+		// 将传入的 transaction 参数转换为 DataSourceTransactionObject 类型。
+		// 这个对象封装了与 JDBC 事务相关的信息，例如 ConnectionHolder（持有数据库连接的对象）和事务状态
 		DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
 
 		// Remove the connection holder from the thread, if exposed.
+		// 检查当前事务是否是通过该事务对象新创建的数据库连接持有者
+		// 如果返回 true，意味着该事务独立管理着连接，需要解绑资源
 		if (txObject.isNewConnectionHolder()) {
+			// 将当前线程中绑定的与数据源（DataSource）相关的资源解除绑定。
+			// 这个资源通常是 ConnectionHolder，用于管理数据库连接
+			// TODO 进入 unbindResource
 			TransactionSynchronizationManager.unbindResource(obtainDataSource());
 		}
 
 		// Reset connection.
+		// 从事务对象的 ConnectionHolder 中获取数据库连接 Connection
+		// ConnectionHolder 封装了当前事务中的 JDBC 连接对象，并且跟踪事务的相关状态，如是否是只读事务、事务的隔离级别等
 		Connection con = txObject.getConnectionHolder().getConnection();
 		try {
+			// 检查事务是否需要恢复数据库连接的自动提交状态
+			// 通常在事务开始时，Spring 会将自动提交状态设置为 false，并在事务完成后恢复原来的状态
 			if (txObject.isMustRestoreAutoCommit()) {
 				con.setAutoCommit(true);
 			}
+			// 调用 DataSourceUtils.resetConnectionAfterTransaction 方法，重置连接的隔离级别和只读状态
+			// txObject.getPreviousIsolationLevel()：获取事务开始前的隔离级别，事务完成后需要将连接的隔离级别恢复到之前的状态
+			// txObject.isReadOnly()：获取事务的只读状态，事务完成后需要根据该状态恢复连接的属性
+			// TODO 进入
 			DataSourceUtils.resetConnectionAfterTransaction(
 					con, txObject.getPreviousIsolationLevel(), txObject.isReadOnly());
 		} catch (Throwable ex) {
 			logger.debug("Could not reset JDBC Connection after transaction", ex);
 		}
 
-		if (txObject.isNewConnectionHolder()) {
+		if (txObject.isNewConnectionHolder()) {// 再次检查当前事务是否是通过该事务对象创建的新连接持有者
 			if (logger.isDebugEnabled()) {
 				logger.debug("Releasing JDBC Connection [" + con + "] after transaction");
 			}
+			// 如果是，则释放这个连接
 			DataSourceUtils.releaseConnection(con, this.dataSource);
 		}
-
+		// 清空 ConnectionHolder 中的状态信息。这通常包括重置连接的事务状态和其他相关信息。
+		// 目的：在事务完成后，清理连接持有者中的状态，确保它不再引用旧的事务信息
 		txObject.getConnectionHolder().clear();
 	}
 
