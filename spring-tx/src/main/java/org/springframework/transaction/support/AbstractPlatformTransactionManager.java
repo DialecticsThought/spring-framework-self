@@ -466,6 +466,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 		 * 在 JPA 中，它可能会调用 EntityTransaction.begin()
 		 *
 		 * TODO 进入
+		 * TODO
+		 *   查看 org.springframework.jdbc.datasource.DataSourceTransactionManager#doBegin
+		 *   因为不同的渠道会有不同的事务管理器的实现
 		 */
 		doBegin(transaction, definition);
 		/**
