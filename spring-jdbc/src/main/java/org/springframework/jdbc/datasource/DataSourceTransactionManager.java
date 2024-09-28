@@ -340,10 +340,34 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		}
 	}
 
+	/**
+	 * 用于挂起当前事务所使用的数据库连接资源。
+	 * 在 Spring 的事务管理中，当事务传播行为为 PROPAGATION_REQUIRES_NEW 或类似的场景时，
+	 * 可能需要挂起当前事务的资源，以便开启一个新的事务。
+	 * 该方法用于将数据库连接从当前线程解绑，并在后续恢复时重新绑定
+	 *
+	 * @param transaction the transaction object returned by {@code doGetTransaction}
+	 * @return
+	 */
 	@Override
 	protected Object doSuspend(Object transaction) {
+		// 传入的 transaction 对象强制转换为 DataSourceTransactionObject 类型。
+		// DataSourceTransactionObject 是 Spring 中用于管理 JDBC 事务的对象，
+		// 封装了与事务相关的数据库连接（ConnectionHolder）信息
 		DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+		// 将事务对象中的 ConnectionHolder（数据库连接持有者）设置为 null，表示当前事务不再持有数据库连接
+		// ConnectionHolder 是一个用于管理数据库连接的对象，封装了 JDBC Connection 及其事务状态（如是否自动提交、是否只读等）
 		txObject.setConnectionHolder(null);
+		/**
+		 * 调用 TransactionSynchronizationManager.unbindResource(obtainDataSource())，
+		 * 		将与数据源（DataSource）相关的资源从当前线程中解绑，并返回被解绑的资源。 (通常是 ConnectionHolder)
+		 *
+		 * obtainDataSource() 返回当前事务所使用的数据源（DataSource）
+		 *
+		 * 被解绑的资源可以在事务恢复时通过 TransactionSynchronizationManager.bindResource() 重新绑定到当前线程
+		 */
+		// TODO 进入 unbindResource
+		//  obtainDataSource的本质就是把该对象的DataSource属性返回
 		return TransactionSynchronizationManager.unbindResource(obtainDataSource());
 	}
 
