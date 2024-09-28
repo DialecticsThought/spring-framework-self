@@ -438,6 +438,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 			} catch (Throwable ex) {
 				// target invocation exception
 				//在方法出现异常的情况下完成事务 也就是异常回滚
+				// TODO 进入
 				completeTransactionAfterThrowing(txInfo, ex);
 				throw ex;
 			} finally {
@@ -454,6 +455,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				}
 			}
 			// 提交事务，并返回业务逻辑的返回值 retVal
+			// TODO 进入
 			commitTransactionAfterReturning(txInfo);
 			return retVal;
 		} else {
@@ -469,6 +471,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				// 通过回调方式执行事务
 				result = ((CallbackPreferringPlatformTransactionManager) ptm).execute(txAttr, status -> {
 					// 准备事务上下文，执行目标业务逻辑
+					// TODO 进入
 					TransactionInfo txInfo = prepareTransactionInfo(ptm, txAttr, joinpointIdentification, status);
 					try {
 						// 通过 invocation.proceedWithInvocation() 执行目标方法，返回值存储在 retVal 中
@@ -764,32 +767,51 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 	 * @param ex     throwable encountered
 	 */
 	protected void completeTransactionAfterThrowing(@Nullable TransactionInfo txInfo, Throwable ex) {
+		/**
+		 * 解释：
+		 * 首先检查 txInfo 和 txInfo.getTransactionStatus() 是否为 null，确保有事务状态需要处理。如果事务状态存在，则进入处理逻辑。
+		 * 目的：防止在没有事务信息或事务状态的情况下执行回滚或提交操作
+		 */
 		if (txInfo != null && txInfo.getTransactionStatus() != null) {
 			if (logger.isTraceEnabled()) {
 				logger.trace("Completing transaction for [" + txInfo.getJoinpointIdentification() +
 						"] after exception: " + ex);
 			}
+			/**
+			 * 解释：
+			 * 检查 txInfo.transactionAttribute 是否存在，并调用 txInfo.transactionAttribute.rollbackOn(ex) 决定是否根据异常类型回滚事务。
+			 * rollbackOn(ex) 是事务属性（TransactionAttribute）中的方法，用于判断当前异常是否应该触发事务回滚。
+			 * 		通常，RuntimeException 和 Error 会触发回滚，而 CheckedException 则不会。
+			 * 目的：根据事务属性的配置，决定当前异常是否需要回滚事务
+			 */
 			if (txInfo.transactionAttribute != null && txInfo.transactionAttribute.rollbackOn(ex)) {
 				try {
+					// 如果异常需要回滚，调用事务管理器的 rollback 方法进行事务回滚，传入事务的状态 txInfo.getTransactionStatus()
 					txInfo.getTransactionManager().rollback(txInfo.getTransactionStatus());
-				} catch (TransactionSystemException ex2) {
+				} catch (TransactionSystemException ex2) {// 捕获回滚中的系统异常
 					logger.error("Application exception overridden by rollback exception", ex);
+					// 调用 ex2.initApplicationException(ex) 方法，将原始异常 ex 存储在 TransactionSystemException 中，便于后续处理或调试
 					ex2.initApplicationException(ex);
+					// 抛出 TransactionSystemException，将异常传播给调用者
 					throw ex2;
-				} catch (RuntimeException | Error ex2) {
+				} catch (RuntimeException | Error ex2) {//如果在回滚过程中抛出其他 RuntimeException 或 Error，记录日志并重新抛出这些异常
 					logger.error("Application exception overridden by rollback exception", ex);
 					throw ex2;
 				}
 			} else {
+				// 如果当前异常不要求回滚，则尝试提交事务。调用事务管理器的 commit 方法，传入当前的事务状态 txInfo.getTransactionStatus()
+
 				// We don't roll back on this exception.
 				// Will still roll back if TransactionStatus.isRollbackOnly() is true.
 				try {
 					txInfo.getTransactionManager().commit(txInfo.getTransactionStatus());
-				} catch (TransactionSystemException ex2) {
+				} catch (TransactionSystemException ex2) {// 捕获提交过程中的系统异常
 					logger.error("Application exception overridden by commit exception", ex);
+					// 调用 ex2.initApplicationException(ex) 方法，将原始应用异常保留在系统异常中，便于后续调试和处理
 					ex2.initApplicationException(ex);
 					throw ex2;
-				} catch (RuntimeException | Error ex2) {
+				} catch (RuntimeException | Error ex2) {// 捕获其他运行时异常和错误
+					// 这种异常通常是资源问题或数据库提交错误导致的
 					logger.error("Application exception overridden by commit exception", ex);
 					throw ex2;
 				}
