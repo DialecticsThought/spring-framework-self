@@ -385,7 +385,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 		final TransactionAttribute txAttr = (tas != null ? tas.getTransactionAttribute(method, targetClass) : null);
 		// 根据获取到的事务属性 txAttr，调用 determineTransactionManager() 来决定使用哪个事务管理器 (TransactionManager)。
 		// Spring 支持不同类型的事务管理器（例如 JDBC 事务管理器、JPA 事务管理器，或响应式事务管理器）
-		// TODO
+		// TODO 进去
 		final TransactionManager tm = determineTransactionManager(txAttr);
 		// this.reactiveAdapterRegistry != null：编程式适配器注册表不为空
 		// tm instanceof ReactiveTransactionManager：是否是编程式事务管理器
@@ -426,6 +426,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 			// Standard transaction demarcation with getTransaction and commit/rollback calls.
 			// 创建事务上下文，返回一个 TransactionInfo 对象，表示当前事务的所有相关信息。
 			// 如果事务是必须的（基于事务属性的传播行为），这个方法会开始事务
+			// TODO 进入
 			TransactionInfo txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);
 
 			Object retVal;
@@ -644,13 +645,20 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 	 * The {@code hasTransaction()} method on TransactionInfo can be used to
 	 * tell if there was a transaction created.
 	 * @see #getTransactionAttributeSource()
+	 *
+	 * <pre>
+	 *   PlatformTransactionManager tm: 事务管理器，用于启动、提交或回滚事务。
+	 *   TransactionAttribute txAttr: 事务属性，包含了事务的传播行为、隔离级别、超时时间等事务相关的配置。
+	 *   String joinpointIdentification: 切点标识，通常是类名和方法名的组合，表示当前事务切入点的标识。
+	 * </pre>
 	 */
 	@SuppressWarnings("serial")
 	protected TransactionInfo createTransactionIfNecessary(@Nullable PlatformTransactionManager tm,
 														   @Nullable TransactionAttribute txAttr, final String joinpointIdentification) {
 
 		// If no name specified, apply method identification as transaction name.
-		if (txAttr != null && txAttr.getName() == null) {
+		if (txAttr != null && txAttr.getName() == null) {// 如果 txAttr（事务属性）存在，但事务属性中没有指定事务名称
+			// 创建一个 DelegatingTransactionAttribute 的匿名内部类，它继承了原始事务属性，并重写 getName() 方法
 			txAttr = new DelegatingTransactionAttribute(txAttr) {
 				@Override
 				public String getName() {
@@ -658,10 +666,15 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				}
 			};
 		}
-
+		// 声明一个 TransactionStatus 对象 status，用于存储事务的当前状态
 		TransactionStatus status = null;
+		// 检查 txAttr 是否存在。如果事务属性为空，说明该方法不需要事务处理，因此后续的事务处理逻辑会被跳过
 		if (txAttr != null) {
 			if (tm != null) {
+				// 使用事务属性 txAttr 来获取事务的状态 TransactionStatus。
+				// getTransaction 方法会根据事务属性启动一个新事务，或者根据传播行为加入已有事务。
+				// TODO 进入
+				// 查看 org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction
 				status = tm.getTransaction(txAttr);
 			} else {
 				if (logger.isDebugEnabled()) {
@@ -670,6 +683,9 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				}
 			}
 		}
+		// TODO 进入
+		// 最后，调用 prepareTransactionInfo() 方法，准备事务的上下文信息，并返回一个 TransactionInfo 对象。
+		// TransactionInfo 包含了事务的状态、事务管理器、事务属性，以及当前的事务上下文等信息
 		return prepareTransactionInfo(tm, txAttr, joinpointIdentification, status);
 	}
 
@@ -681,22 +697,33 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 	 *                                (used for monitoring and logging purposes)
 	 * @param status                  the TransactionStatus for the current transaction
 	 * @return the prepared TransactionInfo object
+	 * <pre>
+	 *   PlatformTransactionManager tm: 事务管理器，可能为 null。
+	 *   TransactionAttribute txAttr: 事务属性，定义了事务的行为，如传播、隔离等，可能为 null。
+	 *   String joinpointIdentification: 方法的标识符，通常是方法名或类名，用于标识当前事务所处的切入点。
+	 *   TransactionStatus status: 事务状态，可能为 null，代表事务的当前状态。
+	 * </pre>
 	 */
 	protected TransactionInfo prepareTransactionInfo(@Nullable PlatformTransactionManager tm,
 													 @Nullable TransactionAttribute txAttr, String joinpointIdentification,
 													 @Nullable TransactionStatus status) {
-
+		// TransactionInfo 用于封装事务管理器、事务属性以及方法的标识符
 		TransactionInfo txInfo = new TransactionInfo(tm, txAttr, joinpointIdentification);
+		// 如果 txAttr 不为 null，说明该方法是事务性的，事务管理逻辑将继续执行
 		if (txAttr != null) {
 			// We need a transaction for this method...
+			// 如果日志级别为 TRACE，则记录当前正在为该方法获取事务。日志信息包含当前事务的标识符
 			if (logger.isTraceEnabled()) {
 				logger.trace("Getting transaction for [" + txInfo.getJoinpointIdentification() + "]");
 			}
 			// The transaction manager will flag an error if an incompatible tx already exists.
+			// 调用 txInfo.newTransactionStatus(status) 方法，为 TransactionInfo 设置事务状态 (TransactionStatus)。
+			// 如果事务属性存在，那么 TransactionStatus 不会为 null，这意味着该方法正在处理一个有效的事务
 			txInfo.newTransactionStatus(status);
 		} else {
 			// The TransactionInfo.hasTransaction() method will return false. We created it only
 			// to preserve the integrity of the ThreadLocal stack maintained in this class.
+			// 如果 txAttr 为 null，则意味着该方法不需要事务管理。在这种情况下，只是记录一条调试日志，指出该方法没有事务性
 			if (logger.isTraceEnabled()) {
 				logger.trace("No need to create transaction for [" + joinpointIdentification +
 						"]: This method is not transactional.");
@@ -706,7 +733,11 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 		// We always bind the TransactionInfo to the thread, even if we didn't create
 		// a new transaction here. This guarantees that the TransactionInfo stack
 		// will be managed correctly even if no transaction was created by this aspect.
+
+		// 无论是否创建了事务，都将 TransactionInfo 绑定到当前线程。
+		// 这样可以确保即使该方法没有创建新的事务，事务信息栈仍然会正确地被管理
 		txInfo.bindToThread();
+		// 返回创建的 TransactionInfo 对象。这个对象封装了与事务相关的所有上下文信息，并且已经绑定到当前线程中
 		return txInfo;
 	}
 
