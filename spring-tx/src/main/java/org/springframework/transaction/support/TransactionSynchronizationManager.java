@@ -173,21 +173,36 @@ public abstract class TransactionSynchronizationManager {
 	 * @param value the value to bind (usually the active resource object)
 	 * @throws IllegalStateException if there is already a value bound to the thread
 	 * @see ResourceTransactionManager#getResourceFactory()
+	 *
+	 * TODO 该方法用于将某个资源（value）与某个键（key）绑定到当前线程中，以确保后续在同一线程中可以使用该资源
 	 */
 	public static void bindResource(Object key, Object value) throws IllegalStateException {
+		// 解包可能被包装的资源键。这是为了确保 key 是实际的资源键，而不是某种代理或包装器
+		// 解包后的键存储在 actualKey 中，它将作为当前线程资源的标识符
 		Object actualKey = TransactionSynchronizationUtils.unwrapResourceIfNecessary(key);
 		Assert.notNull(value, "Value must not be null");
+		// 通过 resources.get() 从 ThreadLocal<Map<Object, Object>> resources 中获取当前线程的资源映射。
+		// 如果当前线程没有任何绑定的资源，这里会返回 null
 		Map<Object, Object> map = resources.get();
 		// set ThreadLocal Map if none found
+		// 如果当前线程没有已绑定的资源映射（即 map == null），则创建一个新的 HashMap 对象用于存储资源
 		if (map == null) {
 			map = new HashMap<>();
+			// 然后通过 resources.set(map) 将新创建的资源映射绑定到当前线程的 ThreadLocal 中
 			resources.set(map);
 		}
+		// 调用 map.put(actualKey, value) 将资源 value 与键 actualKey 绑定到当前线程的资源映射中
+		// 如果该键已经有绑定的资源，则 map.put() 方法会返回先前绑定的资源 oldValue；如果没有先前的绑定，则返回 null
 		Object oldValue = map.put(actualKey, value);
 		// Transparently suppress a ResourceHolder that was marked as void...
+		// 检查 oldValue 是否是一个 ResourceHolder 对象，并且该对象的 isVoid() 方法返回 true
+		// 处理一些特殊情况，避免使用已经标记为无效的资源（void 的资源通常表示它已经完成或不可再用）
 		if (oldValue instanceof ResourceHolder && ((ResourceHolder) oldValue).isVoid()) {
+			// 如果 oldValue 是一个无效的资源持有者（即资源已标记为无效），则将 oldValue 设置为 null
 			oldValue = null;
 		}
+		// 如果 oldValue 不为 null，说明已经有资源与该键绑定，抛出 IllegalStateException 异常
+		// 避免同一个键绑定多个资源，因为这会导致资源混乱和事务问题
 		if (oldValue != null) {
 			throw new IllegalStateException("Already value [" + oldValue + "] for key [" +
 					actualKey + "] bound to thread [" + Thread.currentThread().getName() + "]");

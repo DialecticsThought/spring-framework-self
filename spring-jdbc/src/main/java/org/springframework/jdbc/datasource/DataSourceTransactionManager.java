@@ -290,6 +290,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			// 获取 ConnectionHolder 中的数据库连接 (getConnection())，并将其赋值给 con
 			con = txObject.getConnectionHolder().getConnection();
 			// 该方法会根据传入的 TransactionDefinition 设置隔离级别并返回先前的隔离级别，以便在事务完成后恢复
+			// TODO 进入
 			Integer previousIsolationLevel = DataSourceUtils.prepareConnectionForTransaction(con, definition);
 			// 将先前的隔离级别设置到事务对象中
 			txObject.setPreviousIsolationLevel(previousIsolationLevel);
@@ -312,6 +313,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			}
 			// 调用 prepareTransactionalConnection(con, definition) 准备连接。
 			// 此方法允许进一步的自定义事务连接设置，比如在不同的数据库驱动中进行特定处理
+			// TODO 进入
 			prepareTransactionalConnection(con, definition);
 			// 将 ConnectionHolder 标记为事务活动状态 (setTransactionActive(true))，表示该连接现在处于事务中
 			txObject.getConnectionHolder().setTransactionActive(true);
@@ -326,6 +328,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			// 如果当前事务对象持有新的连接持有者 (isNewConnectionHolder() 返回 true)，则将该连接绑定到当前线程
 			if (txObject.isNewConnectionHolder()) {
 				// (TransactionSynchronizationManager.bindResource())，确保同一线程中的其他操作可以使用该连接
+				// TODO 进入
 				TransactionSynchronizationManager.bindResource(obtainDataSource(), txObject.getConnectionHolder());
 			}
 		} catch (Throwable ex) {

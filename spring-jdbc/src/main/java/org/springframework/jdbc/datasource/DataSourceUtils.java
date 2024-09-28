@@ -164,9 +164,10 @@ public abstract class DataSourceUtils {
 
 	/**
 	 * Prepare the given Connection with the given transaction semantics.
-	 * @param con the Connection to prepare
-	 * @param definition the transaction definition to apply
-	 * @return the previous isolation level, if any
+	 * TODO 该方法的主要作用是为事务准备 JDBC 连接，根据事务定义（TransactionDefinition）设置连接的只读状态和隔离级别
+	 * @param con the Connection to prepare  TODO 需要配置的 JDBC 连接对象，不能为 null
+	 * @param definition the transaction definition to apply TODO  事务定义对象，可能为 null，包含了事务的只读属性和隔离级别等信息
+	 * @return the previous isolation level, if any  TODO  返回 Integer，表示先前的事务隔离级别，如果未更改隔离级别则返回 null
 	 * @throws SQLException if thrown by JDBC methods
 	 * @see #resetConnectionAfterTransaction
 	 * @see Connection#setTransactionIsolation
@@ -177,44 +178,61 @@ public abstract class DataSourceUtils {
 			throws SQLException {
 
 		Assert.notNull(con, "No Connection specified");
-
+		// 通过 logger.isDebugEnabled() 检查当前日志记录器是否启用了调试级别日志，将结果存储在 debugEnabled 变量中
 		boolean debugEnabled = logger.isDebugEnabled();
 		// Set read-only flag.
+		// 检查事务定义是否不为 null，并且事务被标记为只读。如果条件满足，则进入设置连接只读状态的逻辑
 		if (definition != null && definition.isReadOnly()) {
 			try {
 				if (debugEnabled) {
 					logger.debug("Setting JDBC Connection [" + con + "] read-only");
 				}
+				// 调用 con.setReadOnly(true) 将连接设置为只读模式
 				con.setReadOnly(true);
 			}
 			catch (SQLException | RuntimeException ex) {
 				Throwable exToCheck = ex;
+				// 使用 while 循环遍历异常及其原因，检查是否存在包含 "Timeout" 的异常类名
 				while (exToCheck != null) {
+					// 如果发现异常类名包含 "Timeout"，认为是连接超时异常，重新抛出原始异常 ex
 					if (exToCheck.getClass().getSimpleName().contains("Timeout")) {
 						// Assume it's a connection timeout that would otherwise get lost: e.g. from JDBC 4.0
 						throw ex;
 					}
 					exToCheck = exToCheck.getCause();
 				}
+				/**
+				 * 忽略其他异常：
+				 * 记录调试日志：对于其他异常，记录调试日志，指出无法将 JDBC 连接设置为只读，并打印异常堆栈信息。
+				 * 原因：某些数据库驱动可能不支持将连接设置为只读，此时异常可以被安全地忽略，
+				 * 因为只读设置只是一个提示，实际操作中可能不影响事务的执行
+				 */
 				// "read-only not supported" SQLException -> ignore, it's just a hint anyway
 				logger.debug("Could not set JDBC Connection read-only", ex);
 			}
 		}
 
 		// Apply specific isolation level, if any.
+		// 初始化 previousIsolationLevel 为 null，用于存储连接先前的隔离级别，以便在事务完成后恢复
 		Integer previousIsolationLevel = null;
+		// 检查事务定义是否不为 null，并且事务定义中的隔离级别不是默认值（TransactionDefinition.ISOLATION_DEFAULT）
 		if (definition != null && definition.getIsolationLevel() != TransactionDefinition.ISOLATION_DEFAULT) {
+			// 如果启用了调试日志，记录一条信息，指出正在将指定的 JDBC 连接的隔离级别更改为指定的值
 			if (debugEnabled) {
 				logger.debug("Changing isolation level of JDBC Connection [" + con + "] to " +
 						definition.getIsolationLevel());
 			}
+			// 调用 con.getTransactionIsolation() 获取连接当前的事务隔离级别，存储在 currentIsolation 中
 			int currentIsolation = con.getTransactionIsolation();
+			//如果当前隔离级别与事务定义中的隔离级别不同，则需要更改隔离级别
 			if (currentIsolation != definition.getIsolationLevel()) {
+				//  currentIsolation 赋值给 previousIsolationLevel，以便在事务完成后恢复原始隔离级别
 				previousIsolationLevel = currentIsolation;
+				// 调用 con.setTransactionIsolation(definition.getIsolationLevel()) 设置连接的事务隔离级别为事务定义中的值
 				con.setTransactionIsolation(definition.getIsolationLevel());
 			}
 		}
-
+		// 方法返回 previousIsolationLevel，如果未更改隔离级别，则返回 null；如果更改了隔离级别，则返回之前的隔离级别值
 		return previousIsolationLevel;
 	}
 
