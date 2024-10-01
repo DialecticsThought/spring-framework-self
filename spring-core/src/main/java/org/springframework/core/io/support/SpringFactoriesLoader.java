@@ -122,28 +122,52 @@ public final class SpringFactoriesLoader {
 		return loadSpringFactories(classLoader).getOrDefault(factoryTypeName, Collections.emptyList());
 	}
 
+	/**
+	 * 从 META-INF/spring.factories 文件中加载工厂类，并将其按类型分类返回
+	 * 这是 Spring 的一种基于配置的加载机制，它能够动态加载指定的工厂类。
+	 * 这个方法中，首先从缓存中检查是否已经加载过工厂列表，若没有，则从类路径中加载资源文件并解析其内容
+	 * @param classLoader
+	 * @return
+	 */
 	private static Map<String, List<String>> loadSpringFactories(@Nullable ClassLoader classLoader) {
+		// 这两行代码从缓存中检查是否已经为给定的 classLoader 加载过 spring.factories 文件
+		// 如果在缓存中找到了对应的工厂映射（result 不为 null），则直接返回这个结果，避免重复加载。
 		MultiValueMap<String, String> result = cache.get(classLoader);
 		if (result != null) {
 			return result;
 		}
 
 		try {
+			// 接下来使用 classLoader 来加载 META-INF/spring.factories 文件
+			// 根据类加载器是否为 null，决定使用哪个类加载器去获取 FACTORIES_RESOURCE_LOCATION（META-INF/spring.factories）的位置。
+			// getResources() 方法返回的是 URL 枚举，表示可能存在多个 META-INF/spring.factories 文件
 			Enumeration<URL> urls = (classLoader != null ?
 					classLoader.getResources(FACTORIES_RESOURCE_LOCATION) :
 					ClassLoader.getSystemResources(FACTORIES_RESOURCE_LOCATION));
+			// MultiValueMap 是一种键对多个值的映射结构，适合存储一个工厂接口类型对应多个实现类的情况
 			result = new LinkedMultiValueMap<>();
+			// 使用 while 循环迭代所有找到的 META-INF/spring.factories 文件（如果有多个的话）
+			// 对每一个文件，使用 UrlResource 对 URL 进行包装
+			// 然后使用 PropertiesLoaderUtils.loadProperties(resource) 方法将资源文件解析为 Properties 对象
 			while (urls.hasMoreElements()) {
 				URL url = urls.nextElement();
 				UrlResource resource = new UrlResource(url);
 				Properties properties = PropertiesLoaderUtils.loadProperties(resource);
+				// 对于加载到的 Properties，逐个遍历它的条目
+				// entry.getKey() 是工厂的类型名，entry.getValue() 是逗号分隔的工厂实现类名
 				for (Map.Entry<?, ?> entry : properties.entrySet()) {
 					String factoryTypeName = ((String) entry.getKey()).trim();
+					// 通过 StringUtils.commaDelimitedListToStringArray() 方法将逗号分隔的实现类名分解为数组
+					// 对每一个工厂实现类名，去掉前后空格后
+					// 调用 result.add(factoryTypeName, factoryImplementationName.trim()) 将工厂类型和实现类添加到 result 中
+					// MultiValueMap 的结构保证了每个工厂类型可以对应多个实现类
 					for (String factoryImplementationName : StringUtils.commaDelimitedListToStringArray((String) entry.getValue())) {
 						result.add(factoryTypeName, factoryImplementationName.trim());
 					}
 				}
 			}
+			// 将解析后的工厂映射结果存入缓存中。
+			// 下次如果同一个 classLoader 再次请求工厂时，就可以直接从缓存中读取，而不必重新加载和解析资源文件
 			cache.put(classLoader, result);
 			return result;
 		}
