@@ -163,7 +163,16 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	/** Map of bean definition objects, keyed by bean name. */
 	private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>(256);
 
-	/** Map from bean name to merged BeanDefinitionHolder. */
+	/**
+	 *  Map from bean name to merged BeanDefinitionHolder.
+	 * TODO
+	 *  合并 Bean 定义：
+	 * 		Spring 支持 Bean 继承功能，子 Bean 可以继承父 Bean 的定义。
+	 * 		为了避免每次都重复计算子 Bean 的最终定义，Spring 会在第一次合并完成后，将合并后的结果缓存到 mergedBeanDefinitionHolders 中。
+	 * 		这样后续的访问可以直接从缓存中获取合并的 Bean 定义，而不必每次重新计算，提升性能。
+	 * 	Bean 定义别名的支持：
+	 * 		Spring 支持为同一个 Bean 配置多个别名，通过 BeanDefinitionHolder 可以将这些别名关联到同一个 BeanDefinition 上，保证 Bean 定义的一致性。
+	 * */
 	private final Map<String, BeanDefinitionHolder> mergedBeanDefinitionHolders = new ConcurrentHashMap<>(256);
 
 	/** Map of singleton and non-singleton bean names, keyed by dependency type. */
