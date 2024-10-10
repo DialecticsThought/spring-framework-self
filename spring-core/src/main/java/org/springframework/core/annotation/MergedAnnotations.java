@@ -439,6 +439,48 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 *
 	 * <p>Each strategy creates a different set of aggregates that will be
 	 * combined to create the final {@link MergedAnnotations}.
+	 *
+	 * <pre>
+	 *  TODO
+	 *   定义了在使用 MergedAnnotations.from() 方法从某个 AnnotatedElement（如类、方法、字段等）上获取注解时，
+	 *   应该采用的注解搜索策略。每种策略对应不同的搜索范围和方式，影响注解的合并和解析过程
+	 *  TODO
+	 *   eg:
+	 *   	 @Target(ElementType.TYPE)
+	 * 		 @Retention(RetentionPolicy.RUNTIME)
+	 * 		 @Inherited // 标记可继承的注解
+	 * 		 @interface InheritedAnnotation {
+	 *     		String value() default "Inherited";
+	 * 		 }
+	 * 		 @Target(ElementType.TYPE)
+	 * 		 @Retention(RetentionPolicy.RUNTIME)
+	 * 		 @interface NonInheritedAnnotation {
+	 *     		String value() default "NonInherited";
+	 * 		 }
+	 * 	TODO
+	 * 	    @InheritedAnnotation("Base Class - Inherited")
+	 * 		@NonInheritedAnnotation("Base Class - Non Inherited")
+	 * 		class BaseClass {}
+	 *  TODO
+	 * 		@InheritedAnnotation("Interface Inherited Annotation")
+	 * 		interface MyInterface {}
+	 *  TODO
+	 * 		class SubClass extends BaseClass {}
+	 *  TODO
+	 * 		class ImplementedClass extends SubClass implements MyInterface {}
+	 * 	TODO
+	 *   执行MergedAnnotations annotations = MergedAnnotations.from(ImplementedClass.class, SearchStrategy.DIRECT);
+	 *   	=> null
+	 *   执行MergedAnnotations annotations = MergedAnnotations.from(ImplementedClass.class, SearchStrategy.INHERITED_ANNOTATIONS);
+	 *   	=> InheritedAnnotation: Base Class - Inherited
+	 *   执行MergedAnnotations annotations = MergedAnnotations.from(ImplementedClass.class, SearchStrategy.SUPERCLASS);
+	 *   	=> InheritedAnnotation: Base Class - Inherited
+	 * 		   NonInheritedAnnotation: Base Class - Non Inherited
+	 *   执行MergedAnnotations annotation = MergedAnnotations.from(ImplementedClass.class, SearchStrategy.TYPE_HIERARCHY);
+	 *   	=> InheritedAnnotation: Base Class - Inherited
+	 * 		   NonInheritedAnnotation: Base Class - Non Inherited
+	 * 		   InheritedAnnotation: Interface Inherited Annotation
+	 * </pre>
 	 */
 	enum SearchStrategy {
 
@@ -446,6 +488,10 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * Find only directly declared annotations, without considering
 		 * {@link Inherited @Inherited} annotations and without searching
 		 * superclasses or implemented interfaces.
+		 *
+		 * TODO
+		 * 	解释: 这是最简单的策略，只会查找当前元素（例如类或方法）上直接声明的注解，不会考虑父类、接口或通过 @Inherited 注解继承的注解。
+		 *  适用于场景：你只关心某个元素上直接声明的注解，而不考虑继承层次或接口
 		 */
 		DIRECT,
 
@@ -456,6 +502,10 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * {@link Inherited @Inherited} annotation is ignored for all other
 		 * {@linkplain AnnotatedElement annotated elements}. This strategy does
 		 * not search implemented interfaces.
+		 *
+		 * TODO
+		 * 	解释: 该策略会查找直接声明的注解，同时还会查找父类中通过 @Inherited 标记的注解（但不查找接口上的注解）。@Inherited 注解表示，子类可以继承从父类标记的注解，但这种机制只对类有效，对方法和字段无效。
+		 *  适用于场景：你希望获取当前类以及父类中继承的注解，但不关心接口或非 @Inherited 的注解
 		 */
 		INHERITED_ANNOTATIONS,
 
@@ -464,6 +514,10 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * is similar to {@link #INHERITED_ANNOTATIONS} except the annotations
 		 * do not need to be meta-annotated with {@link Inherited @Inherited}.
 		 * This strategy does not search implemented interfaces.
+		 *
+		 * TODO
+		 * 	解释: 该策略会查找当前元素上直接声明的注解，以及父类中的所有注解，而不仅仅是 @Inherited 注解。这意味着父类上的所有注解（无论是否有 @Inherited 标记）都会被考虑，但不会搜索接口中的注解。
+		 * 	适用于场景：你想要从类的继承层次中获取所有注解，但不关心接口上的注解
 		 */
 		SUPERCLASS,
 
@@ -471,6 +525,10 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * Perform a full search of the entire type hierarchy, including
 		 * superclasses and implemented interfaces. Superclass annotations do
 		 * not need to be meta-annotated with {@link Inherited @Inherited}.
+		 *
+		 * TODO
+		 * 	解释: 该策略会在整个类型层次结构中搜索注解，包括父类和接口。与 INHERITED_ANNOTATIONS 不同，父类中的注解不需要 @Inherited 标记，也会被考虑。并且还会搜索实现的接口。
+		 * 	适用于场景：你希望获取类、父类以及接口中的所有注解，不受注解是否 @Inherited 标记的限制
 		 */
 		TYPE_HIERARCHY,
 
@@ -482,6 +540,9 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * need to be meta-annotated with {@link Inherited @Inherited}. When
 		 * searching a {@link Method} source, this strategy is identical to
 		 * {@link #TYPE_HIERARCHY}.
+		 * TODO
+		 * 	解释: 该策略不仅会搜索整个类型层次结构（父类和接口），还会搜索封闭类（即当前类被定义在哪个类内部）。如果你搜索的是方法，那么该策略与 TYPE_HIERARCHY 相同。
+		 *	适用于场景：你希望在类的继承层次结构和它的封闭类（可能是外部类）中都查找注解
 		 */
 		TYPE_HIERARCHY_AND_ENCLOSING_CLASSES
 	}
